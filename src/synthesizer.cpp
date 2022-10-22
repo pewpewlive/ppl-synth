@@ -192,7 +192,7 @@ void NormalizeAmplify(std::vector<float>& data,
   }
 }
 
-std::vector<int16_t> Synthetize(SynthesizerConfig const& config) {
+std::vector<int16_t> Synthesize(SynthesizerConfig const& config) {
   Synthesizer synth(config);
   auto data = synth.GeneratePCMData();
   std::vector<int16_t> final_data;
@@ -206,7 +206,7 @@ std::vector<int16_t> Synthetize(SynthesizerConfig const& config) {
   return final_data;
 }
 
-std::vector<float> SynthetizeFloatVector(SynthesizerConfig const& config) {
+std::vector<float> SynthesizeFloatVector(SynthesizerConfig const& config) {
   Synthesizer synth(config);
   return synth.GeneratePCMData();
 }

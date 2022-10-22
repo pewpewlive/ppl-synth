@@ -1,6 +1,6 @@
 # ppl-synth
 
-The sound synthetizer used in PewPew Live.
+The sound synthesizer used in PewPew Live.
 
 * `src/` contains the code for the library.
 * `example/` contains an example usage of the library. It outputs a raw pcm file that can be played with ffplay:
