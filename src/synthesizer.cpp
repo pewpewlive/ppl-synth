@@ -6,6 +6,8 @@
 #include <random>
 #include <vector>
 
+#define PI static_cast<float>(M_PI)
+
 namespace {
 
 class WaveGenerator {
@@ -37,42 +39,42 @@ template <class T, class S>
     float GetSample(float phase, float time) override { code } \
   };
 
-DEFINE_WAVE_GENERATOR(SineWaveGenerator, return sinf(2 * M_PI * phase);)
+DEFINE_WAVE_GENERATOR(SineWaveGenerator, return sinf(2.0f * PI * phase);)
 
 DEFINE_WAVE_GENERATOR(
     TriangleWaveGenerator,
-    if (phase < 0.25) { return 4 * phase; } if (phase < 0.75) {
+    if (phase < 0.25f) { return 4 * phase; } if (phase < 0.75f) {
       return 2 - 4 * phase;
     } return -4 +
         4 * phase;)
 
-DEFINE_WAVE_GENERATOR(SquareWaveGenerator, return phase < 0.5 ? 1 : -1;)
+DEFINE_WAVE_GENERATOR(SquareWaveGenerator, return phase < 0.5f ? 1 : -1;)
 
 DEFINE_WAVE_GENERATOR(SawtoothWaveGenerator,
-                      return phase < 0.5 ? 2 * phase : -2 + 2 * phase;)
+                      return phase < 0.5f ? 2 * phase : -2 + 2 * phase;)
 
 DEFINE_WAVE_GENERATOR(TangentWaveGenerator,
-                      return std::clamp<float>(0.3 * tanf(M_PI * phase),
+                      return std::clamp<float>(0.3f * tanf(PI * phase),
                                                -2,
                                                2);)
 
 DEFINE_WAVE_GENERATOR(WhistleWaveGenerator,
-                      return 0.75 * sinf(2 * M_PI * phase) +
-                             0.25 * sinf(40 * M_PI * phase);)
+                      return 0.75f * sinf(2 * PI * phase) +
+                             0.25f * sinf(40 * PI * phase);)
 
 DEFINE_WAVE_GENERATOR(BreakerWaveGenerator,
-                      double dummy;
-                      constexpr float factor = 0.866;  // sqrt(0.75)
-                      float p = modf(phase + factor, &dummy);
+                      float dummy;
+                      constexpr float factor = 0.866f;  // sqrt(0.75)
+                      float p = modff(phase + factor, &dummy);
                       return -1 + 2 * std::abs(1 - p * p * 2);)
 
 class WhiteNoiseWaveGenerator : public WaveGenerator {
  public:
   explicit WhiteNoiseWaveGenerator(bool interpolate)
-      : distribution_(-1.0, 1.0), interpolate_(interpolate) {}
+      : distribution_(-1.0f, 1.0f), interpolate_(interpolate) {}
   float GetSample(float phase, float time) override {
-    double dummy;
-    phase = modf(phase * 2, &dummy);
+    float dummy;
+    phase = modff(phase * 2, &dummy);
     if (phase < previous_phase_) {
       previous_random_ = current_random_;
       current_random_ = distribution_(rng_);
@@ -84,7 +86,7 @@ class WhiteNoiseWaveGenerator : public WaveGenerator {
     return current_random_;
   }
   std::mt19937 rng_;
-  std::uniform_real_distribution<> distribution_;
+  std::uniform_real_distribution<float> distribution_;
   float previous_phase_ = 0;
   float previous_random_ = 0;
   float current_random_ = 0;
@@ -96,21 +98,21 @@ class PinkNoiseWaveGenerator : public WaveGenerator {
   explicit PinkNoiseWaveGenerator(bool interpolate)
       : distribution_(-1.0, 1.0), interpolate_(interpolate) {}
   float GetSample(float phase, float time) override {
-    double dummy;
-    phase = modf(phase * 2, &dummy);
+    float dummy;
+    phase = modff(phase * 2, &dummy);
     if (phase < previous_phase_) {
       previous_random_ = current_random_;
       float white = distribution_(rng_);
-      b_[0] = 0.99886 * b_[0] + white * 0.0555179;
-      b_[1] = 0.99332 * b_[1] + white * 0.0750759;
-      b_[2] = 0.96900 * b_[2] + white * 0.1538520;
-      b_[3] = 0.86650 * b_[3] + white * 0.3104856;
-      b_[4] = 0.55000 * b_[4] + white * 0.5329522;
-      b_[5] = -0.7616 * b_[5] + white * 0.0168980;
+      b_[0] = 0.99886f * b_[0] + white * 0.0555179f;
+      b_[1] = 0.99332f * b_[1] + white * 0.0750759f;
+      b_[2] = 0.96900f * b_[2] + white * 0.1538520f;
+      b_[3] = 0.86650f * b_[3] + white * 0.3104856f;
+      b_[4] = 0.55000f * b_[4] + white * 0.5329522f;
+      b_[5] = -0.7616f * b_[5] + white * 0.0168980f;
       current_random_ = (b_[0] + b_[1] + b_[2] + b_[3] + b_[4] + b_[5] + b_[6] +
-                         white * 0.5362) /
-                        7.0;
-      b_[6] = white * 0.115926;
+                         white * 0.5362f) /
+                        7.0f;
+      b_[6] = white * 0.115926f;
     }
     previous_phase_ = phase;
     if (interpolate_) {
@@ -119,7 +121,7 @@ class PinkNoiseWaveGenerator : public WaveGenerator {
     return current_random_;
   }
   std::mt19937 rng_;
-  std::uniform_real_distribution<> distribution_;
+  std::uniform_real_distribution<float> distribution_;
   std::array<float, 7> b_ = {0, 0, 0, 0, 0, 0, 0};
   float previous_phase_ = 0;
   float previous_random_ = 0;
@@ -132,12 +134,12 @@ class BrownNoiseWaveGenerator : public WaveGenerator {
   explicit BrownNoiseWaveGenerator(bool interpolate)
       : distribution_(-0.01, 0.01), interpolate_(interpolate) {}
   float GetSample(float phase, float time) override {
-    double dummy;
-    phase = modf(phase * 2, &dummy);
+    float dummy;
+    phase = modff(phase * 2, &dummy);
     if (phase < previous_phase_) {
       previous_random_ = current_random_;
       current_random_ =
-          std::clamp<double>(current_random_ + distribution_(rng_), -1, 1);
+          std::clamp<float>(current_random_ + distribution_(rng_), -1, 1);
     }
     previous_phase_ = phase;
     if (interpolate_) {
@@ -146,7 +148,7 @@ class BrownNoiseWaveGenerator : public WaveGenerator {
     return current_random_;
   }
   std::mt19937 rng_;
-  std::uniform_real_distribution<> distribution_;
+  std::uniform_real_distribution<float> distribution_;
   float previous_phase_ = 0;
   float previous_random_ = 0;
   float current_random_ = 0;
@@ -242,15 +244,15 @@ std::unique_ptr<WaveGenerator> WaveGeneratorFactory(
 
 Synthesizer::Synthesizer(SynthesizerConfig const& config) : config_(config) {
   config_.frequency_jump1_onset_normalized_ =
-      config_.frequency_jump1_onset_ / 100.0;
+      config_.frequency_jump1_onset_ / 100.0f;
   config_.frequency_jump1_amount_normalized_ =
-      config_.frequency_jump1_amount_ / 100.0;
+      config_.frequency_jump1_amount_ / 100.0f;
   config_.frequency_jump2_onset_normalized_ =
-      config_.frequency_jump2_onset_ / 100.0;
+      config_.frequency_jump2_onset_ / 100.0f;
   config_.frequency_jump2_amount_normalized_ =
-      config_.frequency_jump2_amount_ / 100.0;
-  config_.tremolo_depth_normalized_ = config_.tremolo_depth_ / 100.0;
-  config_.sustain_punch_normalized_ = config_.sustain_punch_ / 100.0;
+      config_.frequency_jump2_amount_ / 100.0f;
+  config_.tremolo_depth_normalized_ = config_.tremolo_depth_ / 100.0f;
+  config_.sustain_punch_normalized_ = config_.sustain_punch_ / 100.0f;
   wave_generator_ = WaveGeneratorFactory(config);
 }
 
@@ -265,10 +267,9 @@ std::vector<float> Synthesizer::GeneratePCMData() {
   // Runs the wave generator and modulate the amplitude.
   for (int i = 0; i < sample_count; i++) {
     float time = i * sample_to_time_factor;
-    double dummy;
-
+    float dummy;
     float current_frequency = config_.FrequencyAt(time);
-    phase = modf(phase + current_frequency * sample_to_time_factor, &dummy);
+    phase = modff(phase + current_frequency * sample_to_time_factor, &dummy);
     float value = wave_generator_->GetSample(phase, time);
     value *= config_.AmplitudeAt(time);
     data.push_back(value);

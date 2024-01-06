@@ -4,6 +4,8 @@
 #include <cmath>
 #include <cstdio>
 
+#define PI static_cast<float>(M_PI)
+
 std::vector<std::pair<const char*, int>> const&
 SynthesizerConfig::FieldsOffsets() {
   static std::vector<std::pair<const char*, int>> offsets = {
@@ -65,15 +67,15 @@ float SynthesizerConfig::AmplitudeAt(float time) {
   if (tremolo_depth_normalized_ != 0) {
     amplitude *=
         1 - tremolo_depth_normalized_ *
-                (0.5 + 0.5 * cosf(2 * M_PI * time * tremolo_frequency_));
+                (0.5f + 0.5f * cosf(2.0f * PI * time * tremolo_frequency_));
   }
   return amplitude;
 };
 
 float SynthesizerConfig::FrequencyAt(float time) {
-  float repeat_frequency = std::fmax(repeat_frequency_, 1.0 / Duration());
-  double dummy;
-  float fraction_in_repetition = modf(time * repeat_frequency, &dummy);
+  float repeat_frequency = std::fmax(repeat_frequency_, 1.0f / Duration());
+  float dummy;
+  float fraction_in_repetition = modff(time * repeat_frequency, &dummy);
   float frequency =
       frequency_ + fraction_in_repetition * frequency_sweep_ +
       fraction_in_repetition * fraction_in_repetition * frequency_delta_sweep_;
@@ -86,7 +88,7 @@ float SynthesizerConfig::FrequencyAt(float time) {
   if (vibrato_depth_ != 0) {
     frequency +=
         1 - vibrato_depth_ *
-                (0.5 - 0.5 * sinf(2 * M_PI * time * vibrato_frequency_));
+                (0.5f - 0.5f * sinf(2.0f * PI * time * vibrato_frequency_));
   }
   return std::fmax(0.0, frequency);
 }
