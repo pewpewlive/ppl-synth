@@ -76,6 +76,10 @@ class SynthesizerConfig {
   bool interpolate_noise_ = false;
 
   int samples_per_second_ = 11025 * 2;
+
+  float harmonics_ = 0.0;
+  float harmonics_falloff_ = 0.0;
+
   WaveGeneratorType wave_generator_type_ = SINE;
 };
 

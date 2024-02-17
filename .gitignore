@@ -4,3 +4,4 @@ build
 
 example/.vscode
 example/build
+example/out

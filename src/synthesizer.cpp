@@ -54,9 +54,7 @@ DEFINE_WAVE_GENERATOR(SawtoothWaveGenerator,
                       return phase < 0.5f ? 2 * phase : -2 + 2 * phase;)
 
 DEFINE_WAVE_GENERATOR(TangentWaveGenerator,
-                      return std::clamp<float>(0.3f * tanf(PI * phase),
-                                               -2,
-                                               2);)
+                      return std::clamp<float>(0.3f * tanf(PI * phase), -2, 2);)
 
 DEFINE_WAVE_GENERATOR(WhistleWaveGenerator,
                       return 0.75f * sinf(2 * PI * phase) +
@@ -264,15 +262,57 @@ std::vector<float> Synthesizer::GeneratePCMData() {
   float sample_to_time_factor = 1.0 / config_.samples_per_second_;
   float phase = 0;
 
+  // Sanitize the inputs
+  const int harmonics = std::clamp<int>(config_.harmonics_, 0, 5);
+  const float harmonics_falloff = std::clamp<float>(config_.harmonics_falloff_, 0, 1);
+
   // Runs the wave generator and modulate the amplitude.
-  for (int i = 0; i < sample_count; i++) {
-    float time = i * sample_to_time_factor;
-    float dummy;
-    float current_frequency = config_.FrequencyAt(time);
-    phase = modff(phase + current_frequency * sample_to_time_factor, &dummy);
-    float value = wave_generator_->GetSample(phase, time);
-    value *= config_.AmplitudeAt(time);
-    data.push_back(value);
+  if (harmonics == 0 || harmonics_falloff <= 0.0f) {
+    // Special case for the usual config (no harmonics)
+    for (int i = 0; i < sample_count; i++) {
+      float time = i * sample_to_time_factor;
+      float dummy;
+      float current_frequency = config_.FrequencyAt(time);
+      phase = modff(phase + current_frequency * sample_to_time_factor, &dummy);
+      float sample = wave_generator_->GetSample(phase, time);
+      sample *= config_.AmplitudeAt(time);
+      data.push_back(sample);
+    }
+  } else {
+    // With harmonics
+    std::vector<float> harmonic_amplitudes;
+    // Prepare harmonics amplitude
+    // 1. Compute total_harmonic_ampl
+    float total_harmonic_ampl = 0.0;
+    {
+      float harmonic_ampl = 1.0;
+      for (int i = 0; i <= harmonics; i++) {
+        total_harmonic_ampl += harmonic_ampl;
+        harmonic_ampl *= harmonics_falloff;
+      }
+    }
+    // 2. Compute the actual amplitudes
+    const float first_harmonic_amp = 1.0f / total_harmonic_ampl;
+    float harmonic_ampl = first_harmonic_amp;
+    for (int i = 0; i <= harmonics; i++) {
+      harmonic_amplitudes.push_back(harmonic_ampl);
+      harmonic_ampl *= harmonics_falloff;
+    }
+    // Actually generate the samples
+    for (int i = 0; i < sample_count; i++) {
+      float time = i * sample_to_time_factor;
+      float dummy;
+      float current_frequency = config_.FrequencyAt(time);
+      phase = modff(phase + current_frequency * sample_to_time_factor, &dummy);
+      float sample = 0;
+      for (int j = 0; j <= harmonics; j++) {
+        float harmonic_phase = modff(phase * (j + 1), &dummy);
+        sample += wave_generator_->GetSample(harmonic_phase, time) *
+                  harmonic_amplitudes[j];
+      }
+      sample *= config_.AmplitudeAt(time);
+      data.push_back(sample);
+    }
   }
 
   // Flang

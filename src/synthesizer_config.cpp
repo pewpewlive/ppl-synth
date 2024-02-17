@@ -33,7 +33,10 @@ SynthesizerConfig::FieldsOffsets() {
       {"frequencyJump2Amount",
        offsetof(SynthesizerConfig, frequency_jump2_amount_)},
       {"vibratoDepth", offsetof(SynthesizerConfig, vibrato_depth_)},
-      {"amplification", offsetof(SynthesizerConfig, amplification_)}};
+      {"amplification", offsetof(SynthesizerConfig, amplification_)},
+      {"harmonics", offsetof(SynthesizerConfig, harmonics_)},
+      {"harmonicsFalloff", offsetof(SynthesizerConfig, harmonics_falloff_)},
+  };
   return offsets;
 }
 
