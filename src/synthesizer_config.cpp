@@ -3,6 +3,7 @@
 #include <cassert>
 #include <cmath>
 #include <cstdio>
+#include <cstddef>
 
 #define PI static_cast<float>(M_PI)
 
