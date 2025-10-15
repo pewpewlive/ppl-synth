@@ -12,7 +12,7 @@ namespace {
 
 class WaveGenerator {
  public:
-  virtual ~WaveGenerator(){};
+  virtual ~WaveGenerator() {};
   virtual float GetSample(float phase, float time) = 0;
 };
 
@@ -34,9 +34,11 @@ template <class T, class S>
 
 }  // namespace
 
-#define DEFINE_WAVE_GENERATOR(name, code)                      \
-  class name : public WaveGenerator {                          \
-    float GetSample(float phase, float time) override { code } \
+#define DEFINE_WAVE_GENERATOR(name, code)               \
+  class name : public WaveGenerator {                   \
+    float GetSample(float phase, float time) override { \
+      code                                              \
+    }                                                   \
   };
 
 DEFINE_WAVE_GENERATOR(SineWaveGenerator, return sinf(2.0f * PI * phase);)
@@ -48,7 +50,16 @@ DEFINE_WAVE_GENERATOR(
     } return -4 +
         4 * phase;)
 
-DEFINE_WAVE_GENERATOR(SquareWaveGenerator, return phase < 0.5f ? 1 : -1;)
+class SquareWaveGenerator : public WaveGenerator {
+ public:
+  SquareWaveGenerator(SynthesizerConfig const& config) : config_(config) {}
+  float GetSample(float phase, float time) override {
+    return phase < config_.SquareDutyAt(time) ? 1 : -1;
+  }
+
+ private:
+  SynthesizerConfig const& config_;
+};
 
 DEFINE_WAVE_GENERATOR(SawtoothWaveGenerator,
                       return phase < 0.5f ? 2 * phase : -2 + 2 * phase;)
@@ -221,7 +232,7 @@ std::unique_ptr<WaveGenerator> WaveGeneratorFactory(
     case SynthesizerConfig::SAWTOOTH:
       return std::make_unique<SawtoothWaveGenerator>();
     case SynthesizerConfig::SQUARE:
-      return std::make_unique<SquareWaveGenerator>();
+      return std::make_unique<SquareWaveGenerator>(config);
     case SynthesizerConfig::TANGENT:
       return std::make_unique<TangentWaveGenerator>();
     case SynthesizerConfig::WHISTLE:
@@ -251,7 +262,9 @@ Synthesizer::Synthesizer(SynthesizerConfig const& config) : config_(config) {
       config_.frequency_jump2_amount_ / 100.0f;
   config_.tremolo_depth_normalized_ = config_.tremolo_depth_ / 100.0f;
   config_.sustain_punch_normalized_ = config_.sustain_punch_ / 100.0f;
-  wave_generator_ = WaveGeneratorFactory(config);
+  config_.square_duty_normalized_ = config_.square_duty_ / 100.0f;
+  config_.square_duty_sweep_normalized_ = config_.square_duty_sweep_ / 100.0f;
+  wave_generator_ = WaveGeneratorFactory(config_);
 }
 
 std::vector<float> Synthesizer::GeneratePCMData() {
@@ -264,7 +277,8 @@ std::vector<float> Synthesizer::GeneratePCMData() {
 
   // Sanitize the inputs
   const int harmonics = std::clamp<int>(config_.harmonics_, 0, 5);
-  const float harmonics_falloff = std::clamp<float>(config_.harmonics_falloff_, 0, 1);
+  const float harmonics_falloff =
+      std::clamp<float>(config_.harmonics_falloff_, 0, 1);
 
   // Runs the wave generator and modulate the amplitude.
   if (harmonics == 0 || harmonics_falloff <= 0.0f) {

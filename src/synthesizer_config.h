@@ -27,11 +27,13 @@ class SynthesizerConfig {
   static WaveGeneratorType WaveGeneratorTypeFromString(std::string const& str);
 
   // Returns the duration of the sound in seconds.
-  float Duration();
+  float Duration() const;
   // |time| in seconds.
-  float AmplitudeAt(float time);
+  float AmplitudeAt(float time) const;
 
-  float FrequencyAt(float time);
+  float FrequencyAt(float time) const;
+
+  float SquareDutyAt(float time) const;
 
   // In seconds.
   float attack_ = 0.0;
@@ -81,6 +83,11 @@ class SynthesizerConfig {
   float harmonics_falloff_ = 0.0;
 
   WaveGeneratorType wave_generator_type_ = SINE;
+
+  float square_duty_ = 50.0;
+  float square_duty_sweep_ = 0.0;
+  float square_duty_normalized_ = 0.5;
+  float square_duty_sweep_normalized_ = 0.0;
 };
 
 #endif  // APPLICATION_AUDIO_SYNTHESIZER_SYNTHESIZER_CONFIG_H_

@@ -2,8 +2,8 @@
 
 #include <cassert>
 #include <cmath>
-#include <cstdio>
 #include <cstddef>
+#include <cstdio>
 
 #define PI static_cast<float>(M_PI)
 
@@ -37,6 +37,8 @@ SynthesizerConfig::FieldsOffsets() {
       {"amplification", offsetof(SynthesizerConfig, amplification_)},
       {"harmonics", offsetof(SynthesizerConfig, harmonics_)},
       {"harmonicsFalloff", offsetof(SynthesizerConfig, harmonics_falloff_)},
+      {"squareDuty", offsetof(SynthesizerConfig, square_duty_)},
+      {"squareDutySweep", offsetof(SynthesizerConfig, square_duty_sweep_)},
   };
   return offsets;
 }
@@ -54,11 +56,11 @@ SynthesizerConfig::WaveGeneratorTypeFromString(std::string const& str) {
   return SINE;
 }
 
-float SynthesizerConfig::Duration() {
+float SynthesizerConfig::Duration() const {
   return attack_ + sustain_ + decay_;
 }
 
-float SynthesizerConfig::AmplitudeAt(float time) {
+float SynthesizerConfig::AmplitudeAt(float time) const {
   float amplitude;
   if (time < attack_) {
     amplitude = time / attack_;
@@ -76,7 +78,7 @@ float SynthesizerConfig::AmplitudeAt(float time) {
   return amplitude;
 };
 
-float SynthesizerConfig::FrequencyAt(float time) {
+float SynthesizerConfig::FrequencyAt(float time) const {
   float repeat_frequency = std::fmax(repeat_frequency_, 1.0f / Duration());
   float dummy;
   float fraction_in_repetition = modff(time * repeat_frequency, &dummy);
@@ -95,4 +97,13 @@ float SynthesizerConfig::FrequencyAt(float time) {
                 (0.5f - 0.5f * sinf(2.0f * PI * time * vibrato_frequency_));
   }
   return std::fmax(0.0, frequency);
+}
+
+float SynthesizerConfig::SquareDutyAt(float time) const {
+  float repeat_frequency = std::fmax(repeat_frequency_, 1.0f / Duration());
+  float dummy;
+  float fraction_in_repetition = modff(time * repeat_frequency, &dummy);
+  float duty = square_duty_normalized_ +
+               fraction_in_repetition * square_duty_sweep_normalized_;
+  return duty;
 }
