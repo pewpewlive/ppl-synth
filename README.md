@@ -65,3 +65,34 @@ make
 ```
 The binary optionally takes the number of iterations per sound as its first
 argument (defaults to 200).
+
+## Tests
+
+`test/` contains a golden test that checks the synthesizer still generates
+approximately the same sounds as before. For the same representative set of
+sounds as the benchmark, it compares, against the reference recorded in
+`test/golden_data.h`, the sample count, the overall RMS and peak amplitude, a
+coarse RMS amplitude envelope over 32 time windows, and a coarse
+zero-crossing-rate profile over those windows.
+
+These are deliberately characteristics that survive small phase/timing drift, so
+output-preserving optimizations (reordered floating-point math, a reformulated
+phase accumulator, an approximate transcendental, ...) keep passing while
+genuine changes to a sound's envelope, energy or pitch are still caught. Raw
+sample values are intentionally not compared: two waveforms that sound the same
+but are shifted by a fraction of a sample differ wildly sample-for-sample.
+
+Build and run it with CMake/CTest:
+```
+mkdir out
+cd out
+cmake ../test
+make
+ctest --output-on-failure
+```
+
+After an *intentional* change to the synthesizer output, regenerate the
+reference (the values depend on the platform's math and RNG implementations):
+```
+./ppl_synth_test --generate > ../test/golden_data.h
+```
