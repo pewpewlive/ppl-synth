@@ -2,7 +2,6 @@
 
 #include <algorithm>
 #include <cmath>
-#include <memory>
 #include <random>
 #include <vector>
 
@@ -10,20 +9,16 @@
 
 namespace {
 
-class WaveGenerator {
- public:
-  virtual ~WaveGenerator() {};
-  virtual float GetSample(float phase, float time) = 0;
-};
-
 class Synthesizer {
  public:
   Synthesizer(SynthesizerConfig const& config);
   std::vector<float> GeneratePCMData();
 
  private:
+  template <class Generator>
+  std::vector<float> GenerateWith(Generator generator);
+
   SynthesizerConfig config_;
-  std::unique_ptr<WaveGenerator> wave_generator_;
 };
 
 template <class T, class S>
@@ -34,11 +29,10 @@ template <class T, class S>
 
 }  // namespace
 
-#define DEFINE_WAVE_GENERATOR(name, code)               \
-  class name : public WaveGenerator {                   \
-    float GetSample(float phase, float time) override { \
-      code                                              \
-    }                                                   \
+#define DEFINE_WAVE_GENERATOR(name, code)             \
+  class name {                                        \
+   public:                                            \
+    float GetSample(float phase, float time) { code } \
   };
 
 DEFINE_WAVE_GENERATOR(SineWaveGenerator, return sinf(2.0f * PI * phase);)
@@ -50,10 +44,10 @@ DEFINE_WAVE_GENERATOR(
     } return -4 +
         4 * phase;)
 
-class SquareWaveGenerator : public WaveGenerator {
+class SquareWaveGenerator {
  public:
   SquareWaveGenerator(SynthesizerConfig const& config) : config_(config) {}
-  float GetSample(float phase, float time) override {
+  float GetSample(float phase, float time) {
     return phase < config_.SquareDutyAt(time) ? 1 : -1;
   }
 
@@ -77,11 +71,11 @@ DEFINE_WAVE_GENERATOR(BreakerWaveGenerator,
                       float p = modff(phase + factor, &dummy);
                       return -1 + 2 * std::abs(1 - p * p * 2);)
 
-class WhiteNoiseWaveGenerator : public WaveGenerator {
+class WhiteNoiseWaveGenerator {
  public:
   explicit WhiteNoiseWaveGenerator(bool interpolate)
       : distribution_(-1.0f, 1.0f), interpolate_(interpolate) {}
-  float GetSample(float phase, float time) override {
+  float GetSample(float phase, float time) {
     float dummy;
     phase = modff(phase * 2, &dummy);
     if (phase < previous_phase_) {
@@ -102,11 +96,11 @@ class WhiteNoiseWaveGenerator : public WaveGenerator {
   bool interpolate_;
 };
 
-class PinkNoiseWaveGenerator : public WaveGenerator {
+class PinkNoiseWaveGenerator {
  public:
   explicit PinkNoiseWaveGenerator(bool interpolate)
       : distribution_(-1.0, 1.0), interpolate_(interpolate) {}
-  float GetSample(float phase, float time) override {
+  float GetSample(float phase, float time) {
     float dummy;
     phase = modff(phase * 2, &dummy);
     if (phase < previous_phase_) {
@@ -138,11 +132,11 @@ class PinkNoiseWaveGenerator : public WaveGenerator {
   bool interpolate_;
 };
 
-class BrownNoiseWaveGenerator : public WaveGenerator {
+class BrownNoiseWaveGenerator {
  public:
   explicit BrownNoiseWaveGenerator(bool interpolate)
       : distribution_(-0.01, 0.01), interpolate_(interpolate) {}
-  float GetSample(float phase, float time) override {
+  float GetSample(float phase, float time) {
     float dummy;
     phase = modff(phase * 2, &dummy);
     if (phase < previous_phase_) {
@@ -222,35 +216,6 @@ std::vector<float> SynthesizeFloatVector(SynthesizerConfig const& config) {
   return synth.GeneratePCMData();
 }
 
-std::unique_ptr<WaveGenerator> WaveGeneratorFactory(
-    SynthesizerConfig const& config) {
-  switch (config.wave_generator_type_) {
-    case SynthesizerConfig::SINE:
-      return std::make_unique<SineWaveGenerator>();
-    case SynthesizerConfig::TRIANGLE:
-      return std::make_unique<TriangleWaveGenerator>();
-    case SynthesizerConfig::SAWTOOTH:
-      return std::make_unique<SawtoothWaveGenerator>();
-    case SynthesizerConfig::SQUARE:
-      return std::make_unique<SquareWaveGenerator>(config);
-    case SynthesizerConfig::TANGENT:
-      return std::make_unique<TangentWaveGenerator>();
-    case SynthesizerConfig::WHISTLE:
-      return std::make_unique<WhistleWaveGenerator>();
-    case SynthesizerConfig::BREAKER:
-      return std::make_unique<BreakerWaveGenerator>();
-    case SynthesizerConfig::WHITE_NOISE:
-      return std::make_unique<WhiteNoiseWaveGenerator>(
-          config.interpolate_noise_);
-    case SynthesizerConfig::PINK_NOISE:
-      return std::make_unique<PinkNoiseWaveGenerator>(
-          config.interpolate_noise_);
-    case SynthesizerConfig::BROWN_NOISE:
-      return std::make_unique<BrownNoiseWaveGenerator>(
-          config.interpolate_noise_);
-  }
-}
-
 Synthesizer::Synthesizer(SynthesizerConfig const& config) : config_(config) {
   config_.frequency_jump1_onset_normalized_ =
       config_.frequency_jump1_onset_ / 100.0f;
@@ -264,10 +229,12 @@ Synthesizer::Synthesizer(SynthesizerConfig const& config) : config_(config) {
   config_.sustain_punch_normalized_ = config_.sustain_punch_ / 100.0f;
   config_.square_duty_normalized_ = config_.square_duty_ / 100.0f;
   config_.square_duty_sweep_normalized_ = config_.square_duty_sweep_ / 100.0f;
-  wave_generator_ = WaveGeneratorFactory(config_);
+  config_.repeat_frequency_prepared_ =
+      std::fmax(config_.repeat_frequency_, 1.0f / config_.Duration());
 }
 
-std::vector<float> Synthesizer::GeneratePCMData() {
+template <class Generator>
+std::vector<float> Synthesizer::GenerateWith(Generator generator) {
   std::vector<float> data;
   float duration = config_.Duration();
   int sample_count = std::ceil(duration * config_.samples_per_second_);
@@ -288,7 +255,7 @@ std::vector<float> Synthesizer::GeneratePCMData() {
       float dummy;
       float current_frequency = config_.FrequencyAt(time);
       phase = modff(phase + current_frequency * sample_to_time_factor, &dummy);
-      float sample = wave_generator_->GetSample(phase, time);
+      float sample = generator.GetSample(phase, time);
       sample *= config_.AmplitudeAt(time);
       data.push_back(sample);
     }
@@ -321,8 +288,8 @@ std::vector<float> Synthesizer::GeneratePCMData() {
       float sample = 0;
       for (int j = 0; j <= harmonics; j++) {
         float harmonic_phase = modff(phase * (j + 1), &dummy);
-        sample += wave_generator_->GetSample(harmonic_phase, time) *
-                  harmonic_amplitudes[j];
+        sample +=
+            generator.GetSample(harmonic_phase, time) * harmonic_amplitudes[j];
       }
       sample *= config_.AmplitudeAt(time);
       data.push_back(sample);
@@ -336,4 +303,30 @@ std::vector<float> Synthesizer::GeneratePCMData() {
   NormalizeAmplify(data, config_);
 
   return data;
+}
+
+std::vector<float> Synthesizer::GeneratePCMData() {
+  switch (config_.wave_generator_type_) {
+    case SynthesizerConfig::SINE:
+      return GenerateWith(SineWaveGenerator{});
+    case SynthesizerConfig::TRIANGLE:
+      return GenerateWith(TriangleWaveGenerator{});
+    case SynthesizerConfig::SAWTOOTH:
+      return GenerateWith(SawtoothWaveGenerator{});
+    case SynthesizerConfig::SQUARE:
+      return GenerateWith(SquareWaveGenerator{config_});
+    case SynthesizerConfig::TANGENT:
+      return GenerateWith(TangentWaveGenerator{});
+    case SynthesizerConfig::WHISTLE:
+      return GenerateWith(WhistleWaveGenerator{});
+    case SynthesizerConfig::BREAKER:
+      return GenerateWith(BreakerWaveGenerator{});
+    case SynthesizerConfig::WHITE_NOISE:
+      return GenerateWith(WhiteNoiseWaveGenerator{config_.interpolate_noise_});
+    case SynthesizerConfig::PINK_NOISE:
+      return GenerateWith(PinkNoiseWaveGenerator{config_.interpolate_noise_});
+    case SynthesizerConfig::BROWN_NOISE:
+      return GenerateWith(BrownNoiseWaveGenerator{config_.interpolate_noise_});
+  }
+  return {};
 }

@@ -79,7 +79,10 @@ float SynthesizerConfig::AmplitudeAt(float time) const {
 };
 
 float SynthesizerConfig::FrequencyAt(float time) const {
-  float repeat_frequency = std::fmax(repeat_frequency_, 1.0f / Duration());
+  float repeat_frequency =
+      repeat_frequency_prepared_ >= 0.0f
+          ? repeat_frequency_prepared_
+          : std::fmax(repeat_frequency_, 1.0f / Duration());
   float dummy;
   float fraction_in_repetition = modff(time * repeat_frequency, &dummy);
   float frequency =
@@ -100,7 +103,10 @@ float SynthesizerConfig::FrequencyAt(float time) const {
 }
 
 float SynthesizerConfig::SquareDutyAt(float time) const {
-  float repeat_frequency = std::fmax(repeat_frequency_, 1.0f / Duration());
+  float repeat_frequency =
+      repeat_frequency_prepared_ >= 0.0f
+          ? repeat_frequency_prepared_
+          : std::fmax(repeat_frequency_, 1.0f / Duration());
   float dummy;
   float fraction_in_repetition = modff(time * repeat_frequency, &dummy);
   float duty = square_duty_normalized_ +

@@ -88,6 +88,10 @@ class SynthesizerConfig {
   float square_duty_sweep_ = 0.0;
   float square_duty_normalized_ = 0.5;
   float square_duty_sweep_normalized_ = 0.0;
+
+  // Cached value of max(repeat_frequency_, 1 / Duration()), which is invariant
+  // over the whole sound.
+  float repeat_frequency_prepared_ = -1.0;
 };
 
 #endif  // APPLICATION_AUDIO_SYNTHESIZER_SYNTHESIZER_CONFIG_H_
