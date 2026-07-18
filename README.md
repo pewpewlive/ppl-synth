@@ -48,3 +48,20 @@ Those raw pcm file can be played with ffplay:
 ```
 ffplay -f s16le -ar 22k -ac 1 out_16bit.pcm
 ```
+
+## Benchmarks
+
+`benchmark/` contains a speed benchmark that synthesizes a representative set
+of 2-second sounds (one per wave generator, plus modulation, harmonics and
+flanger variants) and reports the time per sound.
+
+Build and run it the same way as the example:
+```
+mkdir out
+cd out
+cmake ../benchmark
+make
+./ppl_synth_benchmark
+```
+The binary optionally takes the number of iterations per sound as its first
+argument (defaults to 200).
