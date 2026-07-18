@@ -5,7 +5,11 @@
 #include <cstddef>
 #include <cstdio>
 
-#define PI static_cast<float>(M_PI)
+#include "fast_math.h"
+
+using ppl_synth::FastCosTurns;
+using ppl_synth::FastSinTurns;
+using ppl_synth::Frac;
 
 std::vector<std::pair<const char*, int>> const&
 SynthesizerConfig::FieldsOffsets() {
@@ -73,7 +77,7 @@ float SynthesizerConfig::AmplitudeAt(float time) const {
   if (tremolo_depth_normalized_ != 0) {
     amplitude *=
         1 - tremolo_depth_normalized_ *
-                (0.5f + 0.5f * cosf(2.0f * PI * time * tremolo_frequency_));
+                (0.5f + 0.5f * FastCosTurns(time * tremolo_frequency_));
   }
   return amplitude;
 };
@@ -83,8 +87,7 @@ float SynthesizerConfig::FrequencyAt(float time) const {
       repeat_frequency_prepared_ >= 0.0f
           ? repeat_frequency_prepared_
           : std::fmax(repeat_frequency_, 1.0f / Duration());
-  float dummy;
-  float fraction_in_repetition = modff(time * repeat_frequency, &dummy);
+  float fraction_in_repetition = Frac(time * repeat_frequency);
   float frequency =
       frequency_ + fraction_in_repetition * frequency_sweep_ +
       fraction_in_repetition * fraction_in_repetition * frequency_delta_sweep_;
@@ -97,7 +100,7 @@ float SynthesizerConfig::FrequencyAt(float time) const {
   if (vibrato_depth_ != 0) {
     frequency +=
         1 - vibrato_depth_ *
-                (0.5f - 0.5f * sinf(2.0f * PI * time * vibrato_frequency_));
+                (0.5f - 0.5f * FastSinTurns(time * vibrato_frequency_));
   }
   return std::fmax(0.0, frequency);
 }
@@ -107,8 +110,7 @@ float SynthesizerConfig::SquareDutyAt(float time) const {
       repeat_frequency_prepared_ >= 0.0f
           ? repeat_frequency_prepared_
           : std::fmax(repeat_frequency_, 1.0f / Duration());
-  float dummy;
-  float fraction_in_repetition = modff(time * repeat_frequency, &dummy);
+  float fraction_in_repetition = Frac(time * repeat_frequency);
   float duty = square_duty_normalized_ +
                fraction_in_repetition * square_duty_sweep_normalized_;
   return duty;

@@ -5,7 +5,11 @@
 #include <random>
 #include <vector>
 
-#define PI static_cast<float>(M_PI)
+#include "fast_math.h"
+
+using ppl_synth::FastSinTurns;
+using ppl_synth::FastTanHalfTurns;
+using ppl_synth::Frac;
 
 namespace {
 
@@ -35,7 +39,7 @@ template <class T, class S>
     float GetSample(float phase, float time) { code } \
   };
 
-DEFINE_WAVE_GENERATOR(SineWaveGenerator, return sinf(2.0f * PI * phase);)
+DEFINE_WAVE_GENERATOR(SineWaveGenerator, return FastSinTurns(phase);)
 
 DEFINE_WAVE_GENERATOR(
     TriangleWaveGenerator,
@@ -58,17 +62,17 @@ class SquareWaveGenerator {
 DEFINE_WAVE_GENERATOR(SawtoothWaveGenerator,
                       return phase < 0.5f ? 2 * phase : -2 + 2 * phase;)
 
-DEFINE_WAVE_GENERATOR(TangentWaveGenerator,
-                      return std::clamp<float>(0.3f * tanf(PI * phase), -2, 2);)
+DEFINE_WAVE_GENERATOR(
+    TangentWaveGenerator,
+    return std::clamp<float>(0.3f * FastTanHalfTurns(phase), -2, 2);)
 
 DEFINE_WAVE_GENERATOR(WhistleWaveGenerator,
-                      return 0.75f * sinf(2 * PI * phase) +
-                             0.25f * sinf(40 * PI * phase);)
+                      return 0.75f * FastSinTurns(phase) +
+                             0.25f * FastSinTurns(20.0f * phase);)
 
 DEFINE_WAVE_GENERATOR(BreakerWaveGenerator,
-                      float dummy;
                       constexpr float factor = 0.866f;  // sqrt(0.75)
-                      float p = modff(phase + factor, &dummy);
+                      float p = Frac(phase + factor);
                       return -1 + 2 * std::abs(1 - p * p * 2);)
 
 class WhiteNoiseWaveGenerator {
@@ -76,8 +80,7 @@ class WhiteNoiseWaveGenerator {
   explicit WhiteNoiseWaveGenerator(bool interpolate)
       : distribution_(-1.0f, 1.0f), interpolate_(interpolate) {}
   float GetSample(float phase, float time) {
-    float dummy;
-    phase = modff(phase * 2, &dummy);
+    phase = Frac(phase * 2);
     if (phase < previous_phase_) {
       previous_random_ = current_random_;
       current_random_ = distribution_(rng_);
@@ -101,8 +104,7 @@ class PinkNoiseWaveGenerator {
   explicit PinkNoiseWaveGenerator(bool interpolate)
       : distribution_(-1.0, 1.0), interpolate_(interpolate) {}
   float GetSample(float phase, float time) {
-    float dummy;
-    phase = modff(phase * 2, &dummy);
+    phase = Frac(phase * 2);
     if (phase < previous_phase_) {
       previous_random_ = current_random_;
       float white = distribution_(rng_);
@@ -137,8 +139,7 @@ class BrownNoiseWaveGenerator {
   explicit BrownNoiseWaveGenerator(bool interpolate)
       : distribution_(-0.01, 0.01), interpolate_(interpolate) {}
   float GetSample(float phase, float time) {
-    float dummy;
-    phase = modff(phase * 2, &dummy);
+    phase = Frac(phase * 2);
     if (phase < previous_phase_) {
       previous_random_ = current_random_;
       current_random_ =
@@ -247,14 +248,25 @@ std::vector<float> Synthesizer::GenerateWith(Generator generator) {
   const float harmonics_falloff =
       std::clamp<float>(config_.harmonics_falloff_, 0, 1);
 
+  // When no modulation varies the frequency over time, FrequencyAt is constant
+  // and the whole per-sample computation collapses to a fixed phase increment.
+  const bool constant_frequency =
+      config_.frequency_sweep_ == 0 && config_.frequency_delta_sweep_ == 0 &&
+      config_.frequency_jump1_amount_ == 0 &&
+      config_.frequency_jump2_amount_ == 0 && config_.vibrato_depth_ == 0;
+  const float constant_phase_increment =
+      std::fmax(0.0f, config_.frequency_) * sample_to_time_factor;
+
   // Runs the wave generator and modulate the amplitude.
   if (harmonics == 0 || harmonics_falloff <= 0.0f) {
     // Special case for the usual config (no harmonics)
     for (int i = 0; i < sample_count; i++) {
       float time = i * sample_to_time_factor;
-      float dummy;
-      float current_frequency = config_.FrequencyAt(time);
-      phase = modff(phase + current_frequency * sample_to_time_factor, &dummy);
+      float phase_increment =
+          constant_frequency
+              ? constant_phase_increment
+              : config_.FrequencyAt(time) * sample_to_time_factor;
+      phase = Frac(phase + phase_increment);
       float sample = generator.GetSample(phase, time);
       sample *= config_.AmplitudeAt(time);
       data.push_back(sample);
@@ -282,12 +294,14 @@ std::vector<float> Synthesizer::GenerateWith(Generator generator) {
     // Actually generate the samples
     for (int i = 0; i < sample_count; i++) {
       float time = i * sample_to_time_factor;
-      float dummy;
-      float current_frequency = config_.FrequencyAt(time);
-      phase = modff(phase + current_frequency * sample_to_time_factor, &dummy);
+      float phase_increment =
+          constant_frequency
+              ? constant_phase_increment
+              : config_.FrequencyAt(time) * sample_to_time_factor;
+      phase = Frac(phase + phase_increment);
       float sample = 0;
       for (int j = 0; j <= harmonics; j++) {
-        float harmonic_phase = modff(phase * (j + 1), &dummy);
+        float harmonic_phase = Frac(phase * (j + 1));
         sample +=
             generator.GetSample(harmonic_phase, time) * harmonic_amplitudes[j];
       }
